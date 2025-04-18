@@ -26,13 +26,14 @@ void CALLBACK WinEventProc(
 
         if (hWnd == monitor->desktop || hWnd == monitor->WorkerW) {
             monitor->sendSignal(Monitor::JUMP_TO_DESKTOP);
+            return;
         }
 
         TCHAR className[256];
         int length = GetClassName(hwnd, className, 256);
-        QString aa = QString(className);
-        qDebug() << "className:" << className<<" aa:" << aa<<" equal:"<<(aa == "WorkerW");
-        if (aa == "WorkerW") {
+        QString className_ = QString(className);
+        qDebug() << "className:" << className<<" className_:" << className_<<" equal:"<<(className_ == "WorkerW");
+        if (className_ == "WorkerW" || className_ == "WorkerA" || className_ == "Progman") {
             monitor->sendSignal(Monitor::JUMP_TO_DESKTOP);
         }
     }
