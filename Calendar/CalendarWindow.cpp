@@ -284,7 +284,7 @@ int Timeline::nodeAt(QPoint point) const {
  return -1;
 }
 void Timeline::expandNode(int row,int stage,QPoint globalPosition){
- auto menu=new QMenu(this);menu->setObjectName("nodeDetails");menu->setAttribute(Qt::WA_DeleteOnClose);menu->setStyleSheet("QMenu{background:#faf9f5;color:#293f3c;border:1px solid #a6b5a7;border-radius:4px} QLabel{background:#faf9f5;color:#293f3c;padding:10px;font-size:12px}");
+ auto menu=new QMenu(window()->property("desktopAttached").toBool()?nullptr:this);menu->setObjectName("nodeDetails");menu->setAttribute(Qt::WA_DeleteOnClose);menu->setStyleSheet("QMenu{background:#faf9f5;color:#293f3c;border:1px solid #a6b5a7;border-radius:4px} QLabel{background:#faf9f5;color:#293f3c;padding:10px;font-size:12px}");
  auto action=new QWidgetAction(menu);auto label=new QLabel(menu);label->setObjectName("nodeDetailsText");label->setTextFormat(Qt::PlainText);const auto &c=conferences[row];label->setText(c.name+"\n"+stages[stage]+"  "+c.dates[stage].toString(Qt::ISODate)+"\n"+relativeDays(c.dates[stage]));action->setDefaultWidget(label);menu->addAction(action);menu->popup(globalPosition);
 }
 void Timeline::mousePressEvent(QMouseEvent *e) {
@@ -515,7 +515,7 @@ CalendarWindow::CalendarWindow()
     legend->addWidget(b);
     connect(b, &QPushButton::clicked, this, [this, b, i, style] {
       QColor color = QColorDialog::getColor(
-          timeline->colors[i], this, QStringLiteral("节点颜色 · ") + stages[i],
+          timeline->colors[i], property("desktopAttached").toBool()?nullptr:this, QStringLiteral("节点颜色 · ") + stages[i],
           QColorDialog::DontUseNativeDialog);
       if (!color.isValid())
         return;
@@ -538,6 +538,7 @@ CalendarWindow::CalendarWindow()
   });
   auto footer = new QHBoxLayout;
   status = new QLabel;
+  status->setObjectName("conferenceStatus");
   status->setWordWrap(true);
   status->setStyleSheet("font-size:10px;color:#d3d9d5");
   footer->addWidget(status, 1);
@@ -559,7 +560,7 @@ CalendarWindow::CalendarWindow()
   setLocked(settings.value("locked", false).toBool());
   connect(lockButton, &QPushButton::toggled, this, &CalendarWindow::setLocked);
   connect(add, &QPushButton::clicked, this, [this] { edit(-1); });
-  connect(close, &QPushButton::clicked, this, &QWidget::close);
+  connect(close, &QPushButton::clicked, this, [this]{this->close();if(property("desktopExperiment").toBool())qApp->quit();});
   connect(timeline, &Timeline::editRequested, this, &CalendarWindow::edit);
   connect(timeline, &Timeline::reorderRequested, this,
           &CalendarWindow::reorder);
@@ -716,7 +717,7 @@ void CalendarWindow::edit(int index) {
     c.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
 
   }
-  QDialog dialog(this);
+  QDialog dialog(property("desktopAttached").toBool()?nullptr:this);
   dialog.setStyleSheet(
       "QWidget{background:#faf9f5;color:#293f3c} "
       "QPushButton{background:#fff;border:1px solid #cdd5c9} "
@@ -802,9 +803,12 @@ void CalendarWindow::closeEvent(QCloseEvent *e) {
   settings.setValue("days", timeline->days);
   settings.remove("start");
   QWidget::closeEvent(e);
+  if(e->isAccepted()&&property("desktopExperiment").toBool())qApp->quit();
 }
 
 void CalendarWindow::paintEvent(QPaintEvent *) {
   QPainter painter(this);
   painter.fillRect(rect(), QColor(48, 48, 48, 128));
 }
+
+void CalendarWindow::recreateDesktopWindow(){auto geometry=this->geometry();hide();destroy();setGeometry(geometry);show();}

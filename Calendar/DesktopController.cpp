@@ -54,7 +54,7 @@ bool DesktopController::desktopForeground() const {
 }
 void DesktopController::revealIfNeeded(){
 #ifdef Q_OS_WIN
- if(temporaryTopmost||!desktopForeground()||!window->isVisible())return;
+ if(window->property("desktopAttached").toBool()||temporaryTopmost||!desktopForeground()||!window->isVisible())return;
  HWND h=reinterpret_cast<HWND>(window->winId());if(!IsWindow(h))return;
  bool restore=IsIconic(h)||!IsWindowVisible(h);
  if(!restore&&!desktopCovers(h))return;
@@ -78,6 +78,7 @@ void DesktopController::demote(){
  temporaryTopmost=false;
 }
 void DesktopController::foregroundChanged(){
+ if(window->property("desktopAttached").toBool()){settle.stop();verify.stop();return;}
  if(desktopForeground()){
   settle.start(); // Immediate, coalesced desktop return.
   verify.start(); // Recheck after the Win+D animation, without an unconditional pulse.

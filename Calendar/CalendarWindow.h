@@ -64,6 +64,7 @@ public:
   CalendarWindow();
   bool load();
   bool save();
+  void recreateDesktopWindow();
 
 protected:
   void closeEvent(QCloseEvent *) override;

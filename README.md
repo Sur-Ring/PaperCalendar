@@ -42,3 +42,7 @@ ctest --test-dir build --output-on-failure
 当前实现恢复标签：`paper-calendar-baseline-20261026`。已清理历史发布构建，保留 `build-calendar/desktop-fix`。
 
 WorkerW 的本机只读检查、实际问题与实验建议见 `docs/workerw-research.zh-CN.md`。诊断源码为 `tools/desktop_probe.cpp`，本轮没有切换应用后端。
+
+## 可选桌面挂载实验
+
+实验构建会额外生成 `PaperCalendarWorkerW.exe`，使用独立应用数据目录，默认程序仍使用原来的后端。具体运行和已知验证范围见 `docs/workerw-experiment.zh-CN.md`。
