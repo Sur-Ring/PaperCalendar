@@ -17,7 +17,6 @@ install(TARGETS PaperCalendar RUNTIME DESTINATION bin)
 
 
 add_executable(PaperCalendarWorkerW WIN32 main.cpp Calendar/CalendarWindow.cpp Calendar/CalendarWindow.h Calendar/DesktopController.cpp Calendar/DesktopController.h Calendar/DesktopAttachment.cpp Calendar/DesktopAttachment.h)
-target_compile_definitions(PaperCalendarWorkerW PRIVATE PAPERCALENDAR_EXPERIMENTAL_DESKTOP_HOST=1)
 target_link_libraries(PaperCalendarWorkerW PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
 if(WIN32)
     target_link_libraries(PaperCalendarWorkerW PRIVATE user32)

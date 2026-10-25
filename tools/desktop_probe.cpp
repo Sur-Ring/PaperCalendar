@@ -6,6 +6,8 @@
 #include <string>
 #include <set>
 static std::set<HWND> printed;
+static std::set<DWORD> targetPids;
+static bool target(HWND h){DWORD pid=0;GetWindowThreadProcessId(h,&pid);return targetPids.count(pid)>0;}
 static std::wstring className(HWND h){wchar_t cls[256]={};GetClassNameW(h,cls,256);return cls;}
 static bool shellClass(const std::wstring &s){return s==L"Progman"||s==L"WorkerW"||s==L"SHELLDLL_DefView"||s==L"SysListView32";}
 static void print(HWND h){
@@ -15,8 +17,9 @@ static void print(HWND h){
  HMODULE user=GetModuleHandleW(L"user32.dll");auto dpi=reinterpret_cast<DpiFn>(GetProcAddress(user,"GetDpiForWindow"));auto ctx=reinterpret_cast<CtxFn>(GetProcAddress(user,"GetWindowDpiAwarenessContext"));auto awareness=reinterpret_cast<AwarenessFn>(GetProcAddress(user,"GetAwarenessFromDpiAwarenessContext"));
  std::wcout<<L"class="<<className(h)<<L" hwnd="<<h<<L" parent="<<GetParent(h)<<L" pid="<<pid<<L" visible="<<IsWindowVisible(h)<<L" style=0x"<<std::hex<<GetWindowLongPtrW(h,GWL_STYLE)<<L" exstyle=0x"<<GetWindowLongPtrW(h,GWL_EXSTYLE)<<std::dec<<L" rect="<<r.left<<L","<<r.top<<L","<<r.right<<L","<<r.bottom<<L" dpi="<<(dpi?dpi(h):0)<<L" awareness="<<((ctx&&awareness)?awareness(ctx(h)):-1)<<L" cloaked="<<(SUCCEEDED(status)?int(cloaked):-1)<<L"\n";
 }
-static BOOL CALLBACK child(HWND h,LPARAM){if(shellClass(className(h)))print(h);return TRUE;}
-static BOOL CALLBACK root(HWND h,LPARAM){auto cls=className(h);if(cls==L"Progman"||cls==L"WorkerW"){print(h);EnumChildWindows(h,child,0);}return TRUE;}
-int main(){
+static BOOL CALLBACK child(HWND h,LPARAM){if(shellClass(className(h))||target(h))print(h);return TRUE;}
+static BOOL CALLBACK root(HWND h,LPARAM){auto cls=className(h);if(cls==L"Progman"||cls==L"WorkerW"||target(h)){print(h);EnumChildWindows(h,child,0);}return TRUE;}
+int main(int argc,char **argv){
+ for(int i=1;i<argc;i++)targetPids.insert(static_cast<DWORD>(std::stoul(argv[i])));
  using SetContextFn=BOOL(WINAPI*)(HANDLE);auto setContext=reinterpret_cast<SetContextFn>(GetProcAddress(GetModuleHandleW(L"user32.dll"),"SetProcessDpiAwarenessContext"));if(setContext)setContext(reinterpret_cast<HANDLE>(-4));
  EnumWindows(root,0);if(printed.empty()){std::cout<<"No shell windows visible to this process.\n";return 2;}return 0;}

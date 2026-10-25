@@ -45,4 +45,4 @@ WorkerW 的本机只读检查、实际问题与实验建议见 `docs/workerw-res
 
 ## 可选桌面挂载实验
 
-实验构建会额外生成 `PaperCalendarWorkerW.exe`，使用独立应用数据目录，默认程序仍使用原来的后端。具体运行和已知验证范围见 `docs/workerw-experiment.zh-CN.md`。
+桌面挂载实验在本机实际显示验证失败，已取消自动启用。两个 exe 普通双击均使用原来的后端；仅显式 `--desktop-host` 启用隔离数据的实验。当前挂载关系检查通过但真实显示失败，原有桌面伴随后端仍为默认。具体运行和已知验证范围见 `docs/workerw-experiment.zh-CN.md`。

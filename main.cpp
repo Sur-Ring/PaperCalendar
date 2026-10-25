@@ -8,17 +8,30 @@
 #ifdef Q_OS_WIN
 #include <qt_windows.h>
 #endif
+namespace {
+QString experimentLogPath;
+void experimentLog(QtMsgType type,const QMessageLogContext &,const QString &message){
+ QFile file(experimentLogPath);if(file.open(QIODevice::WriteOnly|QIODevice::Append|QIODevice::Text)){QTextStream stream(&file);stream<<QDateTime::currentDateTime().toString(Qt::ISODateWithMs)<<" ["<<int(type)<<"] "<<message<<"\n";}
+ if(type==QtFatalMsg)abort();
+}
+}
 int main(int argc, char *argv[]) {
   QApplication app(argc, argv);
   QCoreApplication::setOrganizationName("PaperCalendar");
+  // Automatic desktop attachment is disabled after actual visibility failed
+  // on this machine. Retain only an explicit opt-in for future diagnostics.
   bool experiment = app.arguments().contains("--desktop-host");
-#ifdef PAPERCALENDAR_EXPERIMENTAL_DESKTOP_HOST
-  experiment = true;
-#endif
   QCoreApplication::setApplicationName(experiment ? "PaperCalendarWorkerW"
                                                   : "PaperCalendar");
-  if (experiment)
+  if (experiment){
     app.setQuitOnLastWindowClosed(false);
+    auto args=app.arguments();int index=args.indexOf("--data-dir");QString directory=index>=0&&index+1<args.size()?QDir(args[index+1]).absolutePath():QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);QDir().mkpath(directory);experimentLogPath=directory+"/desktop-experiment.log";qInstallMessageHandler(experimentLog);qInfo()<<"Experimental process"<<QCoreApplication::applicationPid();
+  }
+  std::unique_ptr<QLockFile> experimentLock;
+  if(experiment&&!app.arguments().contains("--experiment-check")){
+    experimentLock=std::make_unique<QLockFile>(QStandardPaths::writableLocation(QStandardPaths::TempLocation)+"/PaperCalendarWorkerW-experiment.lock");experimentLock->setStaleLockTime(0);
+    if(!experimentLock->tryLock(0)){QMessageBox::information(nullptr,QStringLiteral("实验程序已在运行"),QStringLiteral("请先检查桌面或托盘中的实验程序，无需重复打开。"));return 0;}
+  }
   CalendarWindow window;
   window.setProperty("desktopExperiment", experiment);
   if(experiment)if(auto title=window.findChild<QLabel*>("dragHeader"))title->setText(QStringLiteral("会议时间轴 · 实验"));
@@ -46,6 +59,16 @@ int main(int argc, char *argv[]) {
     QObject::connect(attachment.get(), &DesktopAttachment::recoveryRequired,
                      &window, &CalendarWindow::recreateDesktopWindow);
     QTimer::singleShot(250, attachment.get(), [&] { attachment->start(); });
+  }
+  QMenu experimentMenu;
+  std::unique_ptr<QSystemTrayIcon> experimentTray;
+  if(experiment&&QSystemTrayIcon::isSystemTrayAvailable()){
+    experimentTray=std::make_unique<QSystemTrayIcon>(app.style()->standardIcon(QStyle::SP_ComputerIcon));experimentTray->setToolTip(QStringLiteral("PaperCalendar 桌面实验（双击恢复窗口）"));
+    auto restore=[&]{if(attachment)attachment->detach();window.show();window.raise();window.activateWindow();};
+    experimentMenu.addAction(QStringLiteral("恢复为普通窗口"),&window,restore);
+    experimentMenu.addAction(QStringLiteral("重新挂到桌面"),&window,[&]{if(attachment)attachment->start();});
+    experimentMenu.addSeparator();experimentMenu.addAction(QStringLiteral("退出实验"),&window,[&]{window.close();});
+    experimentTray->setContextMenu(&experimentMenu);QObject::connect(experimentTray.get(),&QSystemTrayIcon::activated,&window,[&,restore](QSystemTrayIcon::ActivationReason reason){if(reason==QSystemTrayIcon::DoubleClick)restore();});experimentTray->show();
   }
   auto snapshot = [&] {
     int i = app.arguments().indexOf("--snapshot");

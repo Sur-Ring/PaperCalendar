@@ -23,7 +23,7 @@ bool style(HWND h, LONG_PTR value) {
   return previous || GetLastError() == 0;
 }
 } // namespace
-HWND DesktopAttachment::findHost() {
+HWND DesktopAttachment::findIconView() {
   HWND progman = FindWindowW(L"Progman", nullptr);
   HWND found = FindWindowExW(progman, nullptr, L"SHELLDLL_DefView", nullptr);
   if (progman && found && IsWindowVisible(found))
@@ -49,6 +49,14 @@ HWND DesktopAttachment::findHost() {
       reinterpret_cast<LPARAM>(&search));
   return search.result;
 }
+HWND DesktopAttachment::findHost(){
+ HWND view=findIconView();if(!view)return nullptr;
+ HWND root=GetAncestor(view,GA_ROOT);
+ // Modern DefView is itself layered. Use a sibling of it rather than nesting
+ // another layered surface inside the shell's redirected icon view.
+ if(cls(root)=="Progman"&&(GetWindowLongPtrW(root,GWL_EXSTYLE)&WS_EX_NOREDIRECTIONBITMAP))return root;
+ return view;
+}
 #endif
 DesktopAttachment::DesktopAttachment(QWidget *w) : QObject(w), window(w) {
   receiver =
@@ -68,8 +76,10 @@ DesktopAttachment::DesktopAttachment(QWidget *w) : QObject(w), window(w) {
     if (IsWindow(host))
       GetWindowThreadProcessId(host, &pid);
     if (!IsWindow(host) || pid != hostPid || !IsWindow(child) ||
-        GetParent(child) != host || findHost() != host)
-      hostChanged();
+        GetParent(child) != host || findHost() != host){hostChanged();return;}
+    if(cls(host)=="Progman")for(HWND above=GetWindow(child,GW_HWNDPREV);above;above=GetWindow(above,GW_HWNDPREV)){
+      if(cls(above)=="SHELLDLL_DefView"&&IsWindowVisible(above)){SetWindowPos(child,HWND_TOP,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE);break;}
+    }
 #endif
   });
   connect(&retry, &QTimer::timeout, this, [this] {
@@ -140,21 +150,16 @@ bool DesktopAttachment::attach() {
   child = handle;
   host = candidate;
   GetWindowThreadProcessId(host, &hostPid);
-  if (!style(child, (oldStyle & ~WS_POPUP) | WS_CHILD)) {
-    message = QString("SetWindowLongPtr failed: %1").arg(GetLastError());
-    child = nullptr;
-    host = nullptr;
-    return false;
-  }
-  SetLastError(0);
-  SetParent(child, host);
-  DWORD error = GetLastError();
-  if (GetParent(child) != host) {
-    style(child, oldStyle);
-    message = QString("SetParent failed: %1").arg(error);
-    child = nullptr;
-    host = nullptr;
-    return false;
+  foreignHost.reset(QWindow::fromWinId(WId(reinterpret_cast<quintptr>(host))));
+  if(!foreignHost){message="Qt cannot wrap desktop host";child=nullptr;host=nullptr;return false;}
+  LONG_PTR extended=GetWindowLongPtrW(child,GWL_EXSTYLE);
+  SetWindowLongPtrW(child,GWL_EXSTYLE,extended&~WS_EX_LAYERED);
+  window->windowHandle()->setParent(foreignHost.get());
+  child=reinterpret_cast<HWND>(window->winId());
+  SetWindowLongPtrW(child,GWL_EXSTYLE,extended|WS_EX_LAYERED);
+  DWORD error=GetLastError();
+  if(GetParent(child)!=host){
+    window->windowHandle()->setParent(nullptr);foreignHost.reset();style(child,oldStyle);message=QString("Qt reparent failed: %1").arg(error);child=nullptr;host=nullptr;return false;
   }
   POINT point = {rectangle.left, rectangle.top};
   MapWindowPoints(nullptr, host, &point, 1);
@@ -163,7 +168,7 @@ bool DesktopAttachment::attach() {
                     rectangle.bottom - rectangle.top,
                     SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_SHOWWINDOW)) {
     message = QString("Child positioning failed: %1").arg(GetLastError());
-    SetParent(child, oldParent);
+    window->windowHandle()->setParent(nullptr);foreignHost.reset();
     style(child, oldStyle);
     SetWindowPos(child, nullptr, rectangle.left, rectangle.top,
                  rectangle.right - rectangle.left,
@@ -181,6 +186,8 @@ bool DesktopAttachment::attach() {
           .arg(cls(host))
           .arg(bool(GetWindowLongPtrW(child, GWL_EXSTYLE) & WS_EX_LAYERED));
   qInfo().noquote() << message;
+  qInfo()<<"Qt geometry after SetParent"<<window->geometry()<<"frame"<<window->frameGeometry()<<"QWindow"<<window->windowHandle()->geometry();
+  window->update();QTimer::singleShot(0,window,[this]{if(attached){window->repaint();qInfo()<<"Full repaint submitted after SetParent";}});
   monitor.start();
   return true;
 #else
@@ -194,15 +201,9 @@ void DesktopAttachment::detach() {
   if (attached && IsWindow(child)) {
     RECT rectangle;
     bool bounds = GetWindowRect(child, &rectangle);
-    SetLastError(0);
-    SetParent(child, IsWindow(oldParent) ? oldParent : nullptr);
-    DWORD error = GetLastError();
-    if (GetParent(child) == host && error) {
-      qWarning() << "Cannot detach experimental desktop window" << error;
-      if (!stopping)
-        monitor.start();
-      return;
-    }
+    window->windowHandle()->setParent(nullptr);
+    if(GetParent(child)==host){qWarning()<<"Qt detach did not release desktop parent";if(!stopping)monitor.start();return;}
+    foreignHost.reset();
     style(child, oldStyle);
     if (bounds)
       SetWindowPos(child, nullptr, rectangle.left, rectangle.top,
@@ -210,6 +211,7 @@ void DesktopAttachment::detach() {
                    rectangle.bottom - rectangle.top,
                    SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
   }
+  if(foreignHost){if(window->windowHandle())window->windowHandle()->setParent(nullptr);foreignHost.reset();}
   host = nullptr;
   child = nullptr;
 #endif

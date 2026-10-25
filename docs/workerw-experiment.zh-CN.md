@@ -1,4 +1,12 @@
-# 桌面子窗口挂载实验
+# 当前状态：桌面挂载显示验证失败，已回退
+
+2026-10-26 实机反馈确认：原生 DefView 子窗口、Progman 同级子窗口、Qt 同步父子关系并重建 layered 表面的修订，都未在显示桌面后看到时间轴。原生父属关系、visible / cloaked、内部渲染和生命周期检查通过，不能证明桌面实际合成成功。
+
+因此已取消 `PaperCalendarWorkerW.exe` 的自动挂载；普通双击也使用原有桌面伴随后端。代码保留在实验分支，仅显式加 `--desktop-host` 时启用，供后续诊断。不要把本报告下方的早期结构检查结果当成可用性验收。
+
+已排除缺少 Windows 8/10 兼容性清单，未观察到 Qt 的 UpdateLayeredWindowIndirect 错误。具体不可见根因仍未确认，不能断言是某个单一 API 或版本造成。添加了日志、单实例锁和实验托盘恢复入口，但这些并未修复实机不可见。
+
+# 早期实验记录
 
 分支：`codex/workerw-experiment`。基线恢复标签：`paper-calendar-baseline-20261026`。
 
@@ -11,7 +19,7 @@
 直接打开实验 exe 使用独立的应用数据目录：组织名仍为 PaperCalendar，应用名为 PaperCalendarWorkerW。因此不会读取或覆盖正式应用的会议和偏好。带 `--data-dir` 可以进一步指定项目内的隔离目录。
 
 ```powershell
-.\build-calendar\workerw-experiment\PaperCalendarWorkerW.exe --data-dir .\build-calendar\workerw-interactive-data --experiment-demo
+.\build-calendar\workerw-experiment\PaperCalendarWorkerW.exe --desktop-host --data-dir .\build-calendar\workerw-interactive-data --experiment-demo
 ```
 
 `--experiment-demo` 只在内存里生成三条演示会议，不自动保存；编辑保存时写入所指定的隔离数据目录。标题显示“实验”，底栏标记演示会议。真实记录不会被复制进实验目录。
@@ -46,7 +54,7 @@
 可重复的隔离检查：
 
 ```powershell
-.\build-calendar\workerw-experiment\PaperCalendarWorkerW.exe --data-dir .\build-calendar\workerw-check-data --experiment-check --report .\build-calendar\workerw-check.json --snapshot .\build-calendar\workerw-check.png
+.\build-calendar\workerw-experiment\PaperCalendarWorkerW.exe --desktop-host --data-dir .\build-calendar\workerw-check-data --experiment-check --report .\build-calendar\workerw-check.json --snapshot .\build-calendar\workerw-check.png
 ```
 
 `--experiment-check` 自动结束，不会保存演示会议。报告与截图位于 Git 忽略的构建目录。截图是 Qt 自身的渲染结果，不是桌面合成正确的证明。编辑框检查是程序调用，不是实际鼠标命中的证明。

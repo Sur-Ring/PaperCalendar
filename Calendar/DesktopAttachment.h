@@ -30,6 +30,7 @@ private:
   QWidget *window;
   std::unique_ptr<QWidget> receiver;
   QTimer monitor, retry;
+  std::unique_ptr<QWindow> foreignHost;
   QString message;
   bool attached = false, stopping = false;
   int retries = 0;
@@ -38,6 +39,7 @@ private:
   LONG_PTR oldStyle = 0;
   UINT taskbarCreated = 0;
   DWORD hostPid = 0;
+  static HWND findIconView();
   static HWND findHost();
   void hostChanged();
 #endif
