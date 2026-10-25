@@ -36,3 +36,9 @@ ctest --test-dir build --output-on-failure
 桌面伴随使用前台事件、去抖、复核和不抢焦点的临时置顶。Win+D、多显示器、全屏应用、Explorer 重启尚待人工验收。原生边缘锁定逻辑面向 Windows。
 
 旧 StickyNote、ToolBar 文件保留但退出构建。当前数据为日期精度、单实例编辑设计，不支持云同步或并发编辑。
+
+## 本地恢复点与桌面后端研究
+
+当前实现恢复标签：`paper-calendar-baseline-20261026`。已清理历史发布构建，保留 `build-calendar/desktop-fix`。
+
+WorkerW 的本机只读检查、实际问题与实验建议见 `docs/workerw-research.zh-CN.md`。诊断源码为 `tools/desktop_probe.cpp`，本轮没有切换应用后端。
