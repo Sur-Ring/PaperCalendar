@@ -33,7 +33,7 @@ void CALLBACK WinEventProc(
         int length = GetClassName(hwnd, className, 256);
         QString className_ = QString(className);
         qDebug() << "className:" << className<<" className_:" << className_<<" equal:"<<(className_ == "WorkerW");
-        if (className_ == "WorkerW" || className_ == "WorkerA" || className_ == "Progman") {
+        if (className_ == "WorkerW" || className_ == "WorkerA" || className_ == "Progman" || className_ == "SHELLDLL_DefView") {
             monitor->sendSignal(Monitor::JUMP_TO_DESKTOP);
         }
     }

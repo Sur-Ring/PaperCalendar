@@ -1,0 +1,7 @@
+/build-calendar/
+/cmake-build*/
+/.idea/
+/%SystemDrive%/
+/local-backups/
+/out/
+/dist/

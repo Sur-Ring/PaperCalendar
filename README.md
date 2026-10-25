@@ -1,55 +1,38 @@
-This program are designed to appear with your desktop. After you pressed the Win+D and other windows disappeared, it would still be there.
+# Paper Calendar
 
-it`s a simple memo but not todo list.
+基于原桌面便签框架的 Qt 会议时间轴，布局与 `docs/ui-prototype.html` 保持一致。详细设计见 `docs/design.zh-CN.md`。
 
-I don\`t know how to use user32 by c#, so I choose QT
+## 使用
 
+- 滚轮平移时间段；Ctrl + 滚轮缩放；Shift + 滚轮上下滚动列表。
+- 单击会议名称编辑，编辑框内可删除。
+- 拖动左侧六点拖柄排序；选中行后 Alt + ↑ / ↓ 也可排序，顺序自动保存。
+- 点击图例换色，节点、浅色标签与区间同步更新，重启保留。
+- Unlock 时可拖动标题区域、拖动边缘缩放；Lock 锁定窗口位置和大小。
+- 越界时点击“箭头＋今天日期”归位，× 退出。固定使用桌面伴随，不再提供模式选择。窗口背景为半透明灰色。
 
+图例与会议数量合并在底栏。五项日期可直接输入、粘贴或用日历选择，留空表示尚未公布；不再提供“日期已确定”勾选。新增第五个“最终结果”日期；旧记录兼容保留，补填后显示节点。AoE 和时区转换不做改动。
 
-# 这个项目是什么
+摘要前不绘制人为准备区间。日期标签自动错层并用引线对应节点；悬停查看完整事件、日期及剩余天数；点击节点或日期标签展开详情卡片，点击外部或按 Esc 关闭。首次运行没有演示记录。
 
-这个项目旨在创建一个能够与电脑桌面同步出现的便签. 
+数据存于 Qt AppDataLocation 下的 conferences.json 和 settings.ini，Windows 通常为 `%APPDATA%/PaperCalendar/PaperCalendar/`。也可以指定便携目录：
 
-当你按下Win+D时, 其他的窗口都缩小了, 而它会出现在屏幕上, 这样你就能很方便地查看你的便签. 
+```powershell
+.\build-calendar\PaperCalendar.exe --data-dir .\my-data
+```
 
-同时它也不会出现在你的任务栏与alt+tab中.
+## 构建与验证
 
-# 它和类似的项目有什么不同
+需要 CMake 3.16+、C++17、Qt 5.15+ 或 Qt 6 Widgets。编译器须与 Qt ABI 匹配，Qt 与编译器的 bin 应加入 PATH。默认构建测试需要 Qt Test，可用 `-DBUILD_TESTING=OFF` 关闭。
 
-首先, 确实有不少便签软件, 我们首先排除掉不能附着在屏幕上的, 再排除掉永远置顶的, 这两种情况并不是本项目的目标场景. 
+```powershell
+cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH="你的 Qt 安装目录"
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
 
-而其他能与屏幕同时出现的软件: 小黄条改收费了, 之前用的是他; xhznl-todo-list 挺好的, 但是他没有我贴的稳, 按Win+D之后它也会消失, 需要点一下别的窗口才能出现, 但人家界面好看, 毕竟c#. 
+本机当前新版位于 build-calendar/desktop-fix（旧版运行中，避免覆盖），已附 Qt 和编译器运行库。测试使用构建目录下的临时数据目录，不访问真实会议数据；Qt 快照中的会议为演示记录。Windows 原生平台测试需以 `QT_QPA_PLATFORM=windows` 运行 CalendarTests；CTest 默认使用 offscreen。
 
-并且我只做了一个大的输入框, 因为这是便签而不是todo-list, 我打算分两个项目, 便签做的简单一点, todo-list可以去做每日刷新之类的乱七八糟的功能.
+桌面伴随使用前台事件、去抖、复核和不抢焦点的临时置顶。Win+D、多显示器、全屏应用、Explorer 重启尚待人工验收。原生边缘锁定逻辑面向 Windows。
 
-它现在长这样:
-
-![外观演示](./assets/外观演示.png)
-
-小黄条其实之前也会有这个Win+D消失毛病, 不知道收费版解决没有, 其实挺简单的, 最后讲. 下面列了一下类似的项目, 可以看看, 顺便大家提一点, 咱可以把好的项目整理起来一块儿对比一下.
-
-# 一些类似的项目可以看看:
-
-https://github.com/xiajingren/xhznl-todo-list
-
-https://github.com/li-zheng-hao/StickyNotes
-
-https://github.com/tylhk/StickyNotes
-
-# 配置文件
-
-在运行过一次之后, 所在目录下面会生成一个Data文件夹,里面一个todo.txt保存你当前的数据,而另一个cfg.ini就是配置文件, 你可以改一改字号FontSize, 如果win+D之后窗口没有保持在顶层, 就把TopMost改大一点
-
-# 代码结构指路
-
-StickyNote下的StickyNote为桌面便签窗口,Monitor监听前台窗口变化, 当切换到桌面时发出信号, 随后Elevator负责将窗口移动到顶端, Memo为输入区域, 负责监听输入并保存
-
-ToolBar为顶端工具条
-
-# 驻留原理概述
-
-我是用winapi搞定的, c#没用明白winapi, 跑了没效果, 本来想试试avalona的, 最后只好用c++写qt. 思路是先hook到EVENT_SYSTEM_FOREGROUND, 用FindWindow("Progman","Program Manager")获取桌面比较一下当前是不是桌面, 然后用SetWindowPos先设为HWND_TOPMOST过一小会儿再设为HWND_NOTOPMOST就好了, 必须要过一小会, 可能是因为Win+D有动画吧.
-
-# 怎么开机自启动
-
-按Win+R出来运行窗口, 输入shell:startup并确定, 会打开你的当前用户的启动文件夹, 这个文件夹里的程序会在开机时自动启动, 所以你创建一个快捷方式放进去就好了, 不建议把程序直接放进去谢谢.
+旧 StickyNote、ToolBar 文件保留但退出构建。当前数据为日期精度、单实例编辑设计，不支持云同步或并发编辑。

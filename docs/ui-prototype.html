@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>会议时间轴 · 紧凑布局</title>
+<style>
+:root{--paper:#faf9f5;--ink:#293f3c;--line:#dfe3da;--muted:#7a837c;--name-width:124px}
+*{box-sizing:border-box}
+body{margin:0;padding:24px 12px;background:#e7e9e1;color:var(--ink);font:12px 'Microsoft YaHei UI','PingFang SC',sans-serif}
+button,select,input,textarea{font:inherit;color:inherit}
+button,select{padding:4px 8px;border:1px solid #d4dacf;border-radius:4px;background:rgba(255,255,255,.12);color:#eef2ef;cursor:pointer}
+button:hover{background:#eaf0e7}button:focus-visible,select:focus-visible{outline:2px solid #538e88;outline-offset:2px}
+.app{width:560px;max-width:calc(100vw - 24px);min-width:360px;resize:horizontal;margin:auto;border:1px solid #cfd7ca;border-radius:7px;background:rgba(48,48,48,.5);color:#eef2ef;box-shadow:0 12px 36px #34463a12;overflow:hidden}
+header{display:flex;gap:8px;align-items:center;padding:10px 10px 7px}h1{font-size:14px;font-weight:600;margin:0 auto 0 0;white-space:nowrap}
+.primary{background:#293f3c;color:white;border-color:#293f3c}.primary:hover{background:#41615b}
+header{cursor:move;touch-action:none}.app.locked{resize:none}.app.locked header{cursor:default}#lock{width:30px;height:25px;padding:3px;display:inline-flex;align-items:center;justify-content:center}#lock svg{width:18px;height:18px}#lock[aria-pressed="true"]{background:rgba(140,180,140,.28);border-color:#9eaf99}
+.name-cell{display:flex;min-width:0}.name{flex:1;min-width:0;padding-left:3px}.grip{width:19px;flex:none;padding:0;border:0;background:transparent;color:#a0aaa0;cursor:grab;font-size:15px}.grip:active{cursor:grabbing}.row.drop-before{box-shadow:inset 0 2px #293f3c}.row.drop-after{box-shadow:inset 0 -2px #293f3c}.row.drop-before .track{border-top:2px solid #293f3c}.row.drop-after .track{border-bottom:2px solid #293f3c}
+.legend{display:flex;gap:10px;padding:0;color:#d3d9d5;font-size:10px}.legend button{border:0;background:transparent;padding:0;color:inherit;font-size:10px}.legend button:hover{text-decoration:underline;text-underline-offset:3px}.legend button:before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:4px;background:var(--color)}
+.scroll{max-height:370px;overflow:auto;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.timeline{position:relative;min-width:360px}.axis,.row{display:grid;grid-template-columns:var(--name-width) 1fr}.axis{height:32px;color:#d3d9d5;font-size:10px}.axis .label{display:flex;align-items:center;padding:7px 10px 0}
+.track{position:relative;overflow:hidden;border-left:1px solid var(--line)}.tick{position:absolute;top:15px;transform:translateX(-50%);white-space:nowrap}.grid{position:absolute;inset-block:0;border-left:1px solid var(--line)}
+.row{height:40px;border-top:1px solid var(--line)}.name{border:0;border-radius:0;border-right:0;background:transparent;text-align:left;padding:0 10px;font-size:12px;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.name:hover{background:#ffffff22;text-decoration:underline;text-underline-offset:3px}
+.bar{position:absolute;top:0;bottom:0;min-width:0;border-radius:0;overflow:hidden;opacity:.15}.node{position:absolute;top:0;bottom:0;width:0;z-index:1;border-left:1px solid var(--node-color);pointer-events:auto}.node,.date{cursor:pointer}.node-card{position:fixed;z-index:20;max-width:260px;padding:10px 12px;border:1px solid #a6b5a7;border-radius:5px;background:#faf9f5;color:#293f3c;box-shadow:0 5px 20px #0003;font-size:12px;line-height:1.8;white-space:pre-line}.node:after{content:"";position:absolute;left:-5px;width:10px;top:0;bottom:0}.node:before{content:"";position:absolute;top:1px;left:-3px;width:5px;height:5px;border-radius:50%;background:var(--node-color);box-shadow:0 0 0 1px var(--paper)}.date{position:absolute;z-index:3;padding:0 3px;border-radius:2px;font-size:10px;font-weight:700;line-height:14px;color:#293f3c;background:#ffffff;white-space:nowrap;box-shadow:0 0 0 1px var(--label-border),0 1px 2px #263a3020}.bar:after{content:'';position:absolute;inset-block:0;right:0;width:1px;background:#ffffff30}.bar:hover{filter:brightness(1.08)}
+.leaders{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2;overflow:visible}.leaders line{stroke:#293f3c99;stroke-width:1}
+.today-out{position:absolute;top:0;z-index:4;font-size:10px;line-height:15px;padding:0 3px;border:0;border-radius:2px;color:#ffa58e;background:rgba(48,48,48,.82)}.today-out:hover{background:rgba(90,60,50,.9)}
+.today{position:absolute;width:2px;top:0;bottom:0;background:#d66147;pointer-events:none;z-index:2}.today b{position:absolute;top:3px;left:5px;font-size:10px;font-weight:500;color:#c74f38;white-space:nowrap}
+footer{display:flex;gap:8px;justify-content:space-between;padding:7px 10px;color:#d3d9d5;font-size:10px}.empty{padding:35px 10px;text-align:center;color:#d3d9d5}
+dialog{width:390px;max-width:calc(100vw - 24px);padding:18px;border:1px solid #cfd7ca;border-radius:7px;background:var(--paper);color:var(--ink)}dialog::backdrop{background:#223c3544}form{display:grid;gap:12px}#formTitle{font-size:15px}label{display:grid;gap:5px;font-size:11px}input,textarea{width:100%;min-width:0;padding:7px;border:1px solid #cdd5c9;border-radius:4px;background:white}#dates{display:grid;grid-template-columns:1fr 1fr;gap:10px}textarea{height:66px;resize:vertical}#error{color:#b74f36;font-size:11px}.actions{display:flex;gap:7px;align-items:center}.actions .spacer{flex:1}#remove{color:#a24c3f;border-color:transparent;background:transparent}
+@media(max-width:430px){:root{--name-width:105px}body{padding:12px 5px}header{gap:5px}header select{max-width:100px}.name{font-size:11px}}
+</style>
+</head>
+<body>
+<main class="app">
+<header><h1>会议时间轴</h1><button id="lock" aria-pressed="false" title="未锁定：可拖动标题栏和调整窗口宽度" aria-label="未锁定，点击锁定"></button><button class="primary" id="add">＋ 新建</button></header>
+
+<input id="stage-color" type="color" aria-label="节点颜色" style="position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;padding:0;border:0" tabindex="-1">
+<div class="scroll"><div class="timeline" id="timeline"></div></div>
+<footer title="滚轮平移 · Ctrl + 滚轮缩放"><span id="count"></span><div class="legend" aria-label="节点类型图例"><button type="button" data-stage="0" style="--color:#538e88" title="点击修改摘要截止颜色">摘要截止</button><button type="button" data-stage="1" style="--color:#6085b8" title="点击修改正文截止颜色">正文截止</button><button type="button" data-stage="2" style="--color:#c69c55" title="点击修改审稿发布颜色">审稿发布</button><button type="button" data-stage="3" style="--color:#a47796" title="点击修改回复截止颜色">回复截止</button><button type="button" data-stage="4" style="--color:#72925b" title="点击修改最终结果颜色">最终结果</button></div></footer>
+</main>
+<dialog id="dialog"><form id="form"><strong id="formTitle">编辑会议</strong><label>会议名称<input id="name" required maxlength="200"></label><div id="dates"></div><label>论文 / 备注<textarea id="memo"></textarea></label><div id="error" role="alert"></div><div class="actions"><button type="button" id="remove">删除会议</button><span class="spacer"></span><button type="button" id="cancel">取消</button><button class="primary">保存</button></div></form></dialog>
+<script>
+const $=s=>document.querySelector(s);
+const labels=['摘要截止','正文截止','审稿发布','回复截止','最终结果'];
+const intervals=['','摘要截止至正文截止','等待审稿','意见回复','等待结果'];
+const colors=['#538e88','#6085b8','#c69c55','#a47796','#72925b'];
+const today=new Date();
+const T=Date.UTC(today.getFullYear(),today.getMonth(),today.getDate())/86400000;
+const iso=n=>new Date(n*86400000).toISOString().slice(0,10);
+const short=n=>iso(n).slice(5).replace('-','/');
+let days=90,start=T-Math.floor(days/4),editing=-1,locked=false;
+let panelOffset={x:0,y:0};
+// These are illustrative records, not official conference deadlines.
+let rows=[
+ {name:'VISION 2027',dates:[T-12,T+2,T+32,T+40,T+50],note:'演示数据 · 视觉理解与多模态研究'},
+ {name:'LEARNING 2027',dates:[T+8,T+16,T+48,T+58,T+68],note:'演示数据 · 表征学习'},
+ {name:'SYSTEMS 2027',dates:[T-5,T+12,T+38,T+47,T+57],note:'演示数据 · 系统方向'}
+];
+function closeNodeCard(){document.querySelector('.node-card')?.remove()}
+function expandNode(event,stage,date){
+ event.stopPropagation();closeNodeCard();const row=event.currentTarget.closest('.row'),card=el('div','node-card',row.querySelector('.name').textContent+'\n'+nodeTip(stage,date));card.setAttribute('role','dialog');card.setAttribute('aria-label','节点详情');card.tabIndex=-1;document.body.append(card);const anchor=event.currentTarget.getBoundingClientRect(),bounds=card.getBoundingClientRect();card.style.left=Math.max(4,Math.min(anchor.left,window.innerWidth-bounds.width-4))+'px';card.style.top=Math.max(4,Math.min(anchor.bottom+5,window.innerHeight-bounds.height-4))+'px';card.focus();
+}
+document.addEventListener('click',event=>{if(!event.target.closest('.node-card'))closeNodeCard()});document.addEventListener('keydown',event=>{if(event.key==='Escape')closeNodeCard()});
+function nodeTip(stage,date){const now=new Date(),today=Date.UTC(now.getFullYear(),now.getMonth(),now.getDate())/86400000,difference=date-today;return labels[stage]+' '+iso(date)+'\n'+(difference>0?'还有 '+difference+' 天':difference<0?'已过 '+(-difference)+' 天':'今天')}
+function labelTint(hex){return '#'+hex.slice(1).match(/../g).map(v=>Math.round(parseInt(v,16)*.15+255*.85).toString(16).padStart(2,'0')).join('')}
+function labelInk(hex){
+ // Keep the chosen hue and maintain 7:1 contrast on the matching pale background.
+ const rgb=hex.slice(1).match(/../g).map(v=>parseInt(v,16));
+ function luminance(values){const c=values.map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4});return .2126*c[0]+.7152*c[1]+.0722*c[2]}
+ const background=labelTint(hex).slice(1).match(/../g).map(v=>parseInt(v,16));
+ let result=rgb;
+ while((luminance(background)+.05)/(luminance(result)+.05)<7)result=result.map(v=>Math.floor(v*.9));
+ return '#'+result.map(v=>v.toString(16).padStart(2,'0')).join('');
+}
+function setStageColor(stage,color){
+ if(!Number.isInteger(stage)||stage<0||stage>=colors.length||!/^#[0-9a-f]{6}$/i.test(color))return;
+ colors[stage]=color;document.querySelector('.legend [data-stage="'+stage+'"]').style.setProperty('--color',color);render();
+}
+let colorStage=0;
+document.querySelectorAll('.legend button').forEach(button=>button.onclick=()=>{
+ colorStage=Number(button.dataset.stage);const picker=$('#stage-color');picker.value=colors[colorStage];
+ const rect=button.getBoundingClientRect();picker.style.left=rect.left+'px';picker.style.top=rect.bottom+'px';picker.click();
+});
+$('#stage-color').addEventListener('input',event=>setStageColor(colorStage,event.target.value));
+function el(tag,cls,text){const e=document.createElement(tag);e.className=cls||'';if(text!==undefined)e.textContent=text;return e}
+// Try every two-lane assignment, then choose the arrangement that moves labels least.
+// Nodes never move: only labels are packed, with leaders showing their exact anchors.
+function arrangeLabels(track){
+ const width=track.clientWidth,padding=3,gap=4;
+ const items=Array.from(track.querySelectorAll('.node')).map(node=>{
+  const date=Number(node.dataset.date),x=(date-start)/days*width;
+  if(x<0||x>width)return null;
+  const stage=Number(node.dataset.stage);
+  const label=el('span','date',short(date));label.title=nodeTip(stage,date);label.onmouseenter=()=>{label.title=nodeTip(stage,date)};label.onclick=event=>expandNode(event,stage,date);label.style.background=labelTint(colors[stage]);label.style.color=labelInk(colors[stage]);label.style.setProperty('--label-border',colors[stage]);track.append(label);
+  return {x,label,width:label.getBoundingClientRect().width};
+ }).filter(Boolean);
+ if(!items.length)return;
+ let best=null;
+ for(let mask=0;mask<(1<<items.length);mask++){
+  const placements=[];let score=0,valid=true;
+  for(let lane=0;lane<2;lane++){
+   const group=items.map((item,index)=>({...item,index})).filter(item=>((mask>>item.index)&1)===lane);
+   if(!group.length)continue;
+   if(group.reduce((sum,item)=>sum+item.width,0)+(group.length-1)*gap>width-2*padding){valid=false;break}
+   const positions=[];
+   group.forEach((item,i)=>positions.push(Math.max(item.x-item.width/2,i?positions[i-1]+group[i-1].width+gap:padding)));
+   positions[positions.length-1]=Math.min(positions.at(-1),width-padding-group.at(-1).width);
+   for(let i=group.length-2;i>=0;i--)positions[i]=Math.min(positions[i],positions[i+1]-gap-group[i].width);
+   const shift=group.reduce((sum,item,i)=>sum+item.x-item.width/2-positions[i],0)/group.length;
+   const low=padding-positions[0],high=width-padding-positions.at(-1)-group.at(-1).width;
+   const offset=Math.max(low,Math.min(high,shift));
+   group.forEach((item,i)=>{const left=positions[i]+offset;placements.push({item,left,lane});score+=(left+item.width/2-item.x)**2+lane*0.25});
+  }
+  if(valid&&(!best||score<best.score))best={score,placements};
+ }
+ if(!best)return;
+ const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.classList.add('leaders');track.append(svg);
+ best.placements.forEach(({item,left,lane})=>{
+  const top=lane===0?23:7;item.label.style.left=left+'px';item.label.style.top=top+'px';
+  const line=document.createElementNS(svg.namespaceURI,'line');line.setAttribute('x1',item.x);line.setAttribute('y1','3');line.setAttribute('x2',left+item.width/2);line.setAttribute('y2',top);svg.append(line);
+ });
+}
+function render(){
+ closeNodeCard();const host=$('#timeline');host.replaceChildren();
+ const nameWidth=parseInt(getComputedStyle(host).getPropertyValue('--name-width'));
+ const trackWidth=Math.max(1,host.clientWidth-nameWidth);
+ const axis=el('div','axis');axis.append(el('div','label','会议'));const ticks=el('div','track');axis.append(ticks);host.append(axis);
+ let step=days<=45?7:days<=120?14:days<=240?30:60;
+ while(step/days*trackWidth<48)step*=2;
+ for(let n=0;n<days;n+=step){const tick=el('span','tick',short(start+n));tick.style.left=Math.max(20,n/days*trackWidth)+'px';ticks.append(tick)}
+ rows.forEach((r,i)=>{
+  const row=el('div','row'),name=el('button','name',r.name);name.type='button';name.title='编辑 '+r.name;name.onclick=()=>edit(i);
+  const cell=el('div','name-cell'),grip=el('button','grip','⠿');grip.type='button';grip.draggable=true;grip.title='上下拖动排序；Alt + ↑ / ↓ 也可调整';grip.setAttribute('aria-label','调整 '+r.name+' 的顺序');
+  grip.ondragstart=e=>{e.dataTransfer.setData('application/x-paper-calendar-row',String(i));e.dataTransfer.effectAllowed='move'};
+  grip.ondragend=()=>clearDropHints();
+  grip.onkeydown=e=>{if(e.altKey&&(e.key==='ArrowUp'||e.key==='ArrowDown')){e.preventDefault();const target=e.key==='ArrowUp'?i-1:i+1;if(target>=0&&target<rows.length){moveRow(i,e.key==='ArrowUp'?i-1:i+2);document.querySelectorAll('.grip')[target].focus()}}};
+  row.ondragover=e=>{if(!Array.from(e.dataTransfer.types).includes('application/x-paper-calendar-row'))return;e.preventDefault();e.dataTransfer.dropEffect='move';clearDropHints();row.classList.add(e.clientY<row.getBoundingClientRect().top+row.clientHeight/2?'drop-before':'drop-after')};
+  row.ondrop=e=>{e.preventDefault();const value=e.dataTransfer.getData('application/x-paper-calendar-row');if(value==='')return;const from=Number(value);if(!Number.isInteger(from)||from<0||from>=rows.length)return;const after=e.clientY>=row.getBoundingClientRect().top+row.clientHeight/2;moveRow(from,i+(after?1:0))};
+  cell.append(grip,name);row.append(cell);
+  const track=el('div','track');
+  for(let n=0;n<days;n+=step){const grid=el('i','grid');grid.style.left=n/days*100+'%';track.append(grid)}
+  r.dates.forEach((d,j)=>{
+   if(j===0||d===null||r.dates[j-1]===null)return;
+   const begin=r.dates[j-1];if(d===begin)return;
+   const bar=el('div','bar');bar.dataset.start=begin;bar.dataset.end=d;
+   bar.style.cssText=`left:${(begin-start)/days*100}%;width:${(d-begin)/days*100}%;background:${colors[j]}`;
+   bar.title=intervals[j]+' · '+iso(begin)+' — '+iso(d);
+   track.append(bar);
+  });
+  r.dates.forEach((d,j)=>{
+   if(d===null)return;
+   const node=el('div','node');node.style.left=(d-start)/days*100+'%';node.title=nodeTip(j,d);node.onmouseenter=()=>{node.title=nodeTip(j,d)};node.onclick=event=>expandNode(event,j,d);node.style.setProperty('--node-color',colors[j]);
+   node.dataset.date=d;node.dataset.stage=j;track.append(node);
+  });
+  row.append(track);host.append(row);arrangeLabels(track);
+ });
+ if(!rows.length)host.append(el('div','empty','点击「＋ 新建」添加会议'));
+ if(T>=start&&T<=start+days){const line=el('div','today');line.style.left=(nameWidth+trackWidth*(T-start)/days)+'px';line.append(el('b','','今天 '+short(T)));host.append(line)}else{const left=T<start,edge=el('button','today-out',left?'← 今天 '+short(T):'今天 '+short(T)+' →');edge.type='button';edge.dataset.direction=left?'left':'right';edge.title='今天 '+iso(T)+'，点击归位';edge.style[left?'left':'right']=(left?nameWidth+3:3)+'px';edge.onclick=goToToday;host.append(edge)}
+ $('#count').textContent=rows.length+' 个会议';
+}
+function clearDropHints(){document.querySelectorAll('.drop-before,.drop-after').forEach(row=>row.classList.remove('drop-before','drop-after'))}
+function moveRow(from,insertion){const [item]=rows.splice(from,1);rows.splice(insertion>from?insertion-1:insertion,0,item);render()}
+function edit(i){
+ editing=i;const r=rows[i]||{name:'',note:'',dates:[null,null,null,null,null]};
+ $('#formTitle').textContent=i<0?'新建会议':'编辑会议';$('#name').value=r.name;$('#memo').value=r.note;$('#remove').hidden=i<0;$('#dates').replaceChildren();
+ labels.forEach((text,j)=>{const label=el('label','',text),input=el('input');input.type='date';input.id='date'+j;input.value=r.dates[j]===null?'':iso(r.dates[j]);label.append(input);$('#dates').append(label)});
+ $('#error').textContent='';$('#dialog').showModal();
+}
+$('#add').onclick=()=>edit(-1);
+$('#cancel').onclick=()=>$('#dialog').close();
+$('#form').onsubmit=e=>{
+ e.preventDefault();const name=$('#name').value.trim(),dates=labels.map((_,j)=>$('#date'+j).value?Date.parse($('#date'+j).value)/86400000:null);
+ const known=dates.filter(d=>d!==null);
+ if(!name||known.some((d,j)=>!Number.isFinite(d)||(j&&d<known[j-1]))){$('#error').textContent='请填写名称，确保摘要 ≤ 正文 ≤ 审稿 ≤ 回复 ≤ 最终结果。';return}
+ const r={name,dates,note:$('#memo').value};if(editing<0)rows.push(r);else rows[editing]=r;$('#dialog').close();render();
+};
+$('#remove').onclick=()=>{if(editing>=0&&confirm('确定删除 '+rows[editing].name+'？')){rows.splice(editing,1);$('#dialog').close();render()}};
+function goToToday(){start=T-Math.floor(days/4);render()}
+$('#timeline').addEventListener('wheel',e=>{
+ if(!e.deltaY&&!e.deltaX)return;e.preventDefault();
+ const delta=e.deltaY||e.deltaX;
+ if(!e.ctrlKey){start+=Math.sign(delta)*Math.max(1,Math.round(days/20));render();return}
+ const center=start+Math.floor(days/2);days=Math.max(14,Math.min(730,Math.round(days*(delta<0?.8:1.25))));start=center-Math.floor(days/2);
+ render();
+},{passive:false});
+function lockIcon(locked){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="'+(locked?'M8 10V6C8 1 16 1 16 6V10':'M10 10V6C10 1 18 1 18 6')+'"/><circle cx="12" cy="15" r=".8"/><path d="M12 16V18"/></svg>'}
+$('#lock').innerHTML=lockIcon(false);
+$('#lock').onclick=()=>{locked=!locked;$('.app').classList.toggle('locked',locked);$('#lock').setAttribute('aria-pressed',String(locked));$('#lock').innerHTML=lockIcon(locked);$('#lock').setAttribute('aria-label',locked?'已锁定，点击解锁':'未锁定，点击锁定');$('#lock').title=locked?'已锁定窗口位置与大小，点击解锁':'未锁定：可拖动标题栏和调整窗口宽度'};
+$('header').addEventListener('pointerdown',e=>{
+ if(locked||e.button!==0||e.target.closest('button,select'))return;
+ const header=$('header'),origin={x:e.clientX-panelOffset.x,y:e.clientY-panelOffset.y};header.setPointerCapture(e.pointerId);
+ const move=event=>{if(locked)return;panelOffset={x:event.clientX-origin.x,y:event.clientY-origin.y};$('.app').style.transform=`translate(${panelOffset.x}px,${panelOffset.y}px)`};
+ const end=()=>{header.removeEventListener('pointermove',move);header.removeEventListener('pointerup',end);header.removeEventListener('pointercancel',end)};
+ header.addEventListener('pointermove',move);header.addEventListener('pointerup',end);header.addEventListener('pointercancel',end);
+});
+new ResizeObserver(render).observe($('.app'));render();
+</script>
+</body>
+</html>

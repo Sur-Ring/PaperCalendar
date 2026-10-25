@@ -1,84 +1,32 @@
 cmake_minimum_required(VERSION 3.16)
-
-project(DesktopNotes VERSION 0.1 LANGUAGES CXX)
-
-set(CMAKE_AUTOUIC ON)
+project(PaperCalendar VERSION 1.0 LANGUAGES CXX)
 set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTORCC ON)
-
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets)
+add_executable(PaperCalendar WIN32 main.cpp Calendar/CalendarWindow.cpp Calendar/CalendarWindow.h Calendar/DesktopController.cpp Calendar/DesktopController.h)
+target_link_libraries(PaperCalendar PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
+if(WIN32)
+    target_link_libraries(PaperCalendar PRIVATE user32)
+endif()
+if(MSVC)
+    target_compile_options(PaperCalendar PRIVATE /utf-8)
+endif()
+install(TARGETS PaperCalendar RUNTIME DESTINATION bin)
 
-INCLUDE_DIRECTORIES(
-        ${PROJECT_SOURCE_DIR}
-)
-
-set(PROJECT_SOURCES
-        main.cpp
-        StickyNote/StickyNote.cpp
-        StickyNote/StickyNote.h
-        StickyNote/StickyNote.ui
-        StickyNote/Monitor.cpp
-        StickyNote/Monitor.h
-        StickyNote/Elevator.cpp
-        StickyNote/Elevator.h
-        StickyNote/Memo.cpp
-        StickyNote/Memo.h
-        StickyNote/Memo.ui
-        ToolBar/ToolBar.cpp
-        ToolBar/ToolBar.h
-        ToolBar/ToolBar.ui
-)
-
-if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
-    qt_add_executable(DesktopNotes
-        MANUAL_FINALIZATION
-        ${PROJECT_SOURCES}
-    )
-# Define target properties for Android with Qt 6 as:
-#    set_property(TARGET DesktopNotes APPEND PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR
-#                 ${CMAKE_CURRENT_SOURCE_DIR}/android)
-# For more information, see https://doc.qt.io/qt-6/qt-add-executable.html#target-creation
-else()
-    if(ANDROID)
-        add_library(DesktopNotes SHARED
-            ${PROJECT_SOURCES}
-        )
-# Define properties for Android with Qt 5 after find_package() calls as:
-#    set(ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/android")
-    else()
-        add_executable(DesktopNotes
-            ${PROJECT_SOURCES}
-        )
+include(CTest)
+if(BUILD_TESTING)
+    find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Test)
+    add_executable(CalendarTests tests/calendar_tests.cpp Calendar/CalendarWindow.cpp Calendar/CalendarWindow.h Calendar/DesktopController.cpp Calendar/DesktopController.h)
+    target_include_directories(CalendarTests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(CalendarTests PRIVATE Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Test)
+    if(WIN32)
+        target_link_libraries(CalendarTests PRIVATE user32)
     endif()
-endif()
-
-target_link_libraries(DesktopNotes PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
-
-# Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
-# If you are developing for iOS or macOS you should consider setting an
-# explicit, fixed bundle identifier manually though.
-if(${QT_VERSION} VERSION_LESS 6.1.0)
-  set(BUNDLE_ID_OPTION MACOSX_BUNDLE_GUI_IDENTIFIER com.example.DesktopNotes)
-endif()
-set_target_properties(DesktopNotes PROPERTIES
-    ${BUNDLE_ID_OPTION}
-    MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
-    MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
-    MACOSX_BUNDLE TRUE
-    WIN32_EXECUTABLE TRUE
-)
-
-include(GNUInstallDirs)
-install(TARGETS DesktopNotes
-    BUNDLE DESTINATION .
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-)
-
-if(QT_VERSION_MAJOR EQUAL 6)
-    qt_finalize_executable(DesktopNotes)
+    if(MSVC)
+        target_compile_options(CalendarTests PRIVATE /utf-8)
+    endif()
+    add_test(NAME CalendarTests COMMAND CalendarTests)
+    set_tests_properties(CalendarTests PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endif()
