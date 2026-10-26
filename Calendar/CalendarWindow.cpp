@@ -148,8 +148,9 @@ void Timeline::refresh() {
   setMinimumHeight(AxisHeight + qMax(1, conferences.size()) * RowHeight);
   update();
 }
+void Timeline::setScrollOffset(int value){headerOffset=qMax(0,value);update();}
 int Timeline::rowAt(int y) const {
-  return y < AxisHeight ? -1
+  return y < headerOffset+AxisHeight ? -1
          : (y - AxisHeight) / RowHeight < conferences.size()
              ? (y - AxisHeight) / RowHeight
              : -1;
@@ -164,18 +165,8 @@ void Timeline::paintEvent(QPaintEvent *) {
   int tick = days <= 45 ? 7 : days <= 120 ? 14 : days <= 240 ? 30 : 60;
   while (tick * scale < 48)
     tick *= 2;
-  p.setFont(smallFont());
-  p.setPen(QColor("#d3d9d5"));
-  p.drawText(QRect(10, 9, 100, 20), Qt::AlignVCenter, QStringLiteral("会议"));
-  for (int n = 0; n < days; n += tick) {
-    double px = x(start.addDays(n));
-    p.setPen(QColor(255, 255, 255, 35));
-    p.drawLine(QPointF(px, AxisHeight), QPointF(px, height()));
-    p.setPen(QColor("#d3d9d5"));
-    p.drawText(QRectF(qBound(double(NameWidth), px - 21, double(width() - 43)),
-                      14, 42, 17),
-               Qt::AlignCenter, start.addDays(n).toString("MM/dd"));
-  }
+  p.save();p.setClipRect(QRect(0,headerOffset+AxisHeight,width(),height()),Qt::IntersectClip);
+  for(int n=0;n<days;n+=tick){double px=x(start.addDays(n));p.setPen(QColor(255,255,255,35));p.drawLine(QPointF(px,AxisHeight),QPointF(px,height()));}
   for (int i = 0; i < conferences.size(); i++) {
     const auto &c = conferences[i];
     int y = AxisHeight + i * RowHeight;
@@ -198,7 +189,7 @@ void Timeline::paintEvent(QPaintEvent *) {
         QRect(23, y, NameWidth - 27, RowHeight), Qt::AlignVCenter,
         p.fontMetrics().elidedText(c.name, Qt::ElideRight, NameWidth - 27));
     p.save();
-    p.setClipRect(QRect(NameWidth, y, int(tw), RowHeight));
+    p.setClipRect(QRect(NameWidth, y, int(tw), RowHeight),Qt::IntersectClip);
     for (int j = 1; j < 5; j++) {
       if (!c.dates[j].isValid() || !c.dates[j-1].isValid())
         continue;
@@ -246,12 +237,35 @@ void Timeline::paintEvent(QPaintEvent *) {
     }
     p.restore();
   }
+  if (insertion >= 0) {
+    p.setPen(QPen(QColor("#eef2ef"), 2));
+    int y = AxisHeight + insertion * RowHeight;
+    p.drawLine(0, y, width(), y);
+  }
+  if (conferences.isEmpty()) {
+    p.setPen(QColor("#d3d9d5"));
+    p.drawText(QRect(0, AxisHeight, width(), RowHeight), Qt::AlignCenter,
+               QStringLiteral("点击「＋ 新建」添加会议"));
+  }
+  p.restore();p.save();p.translate(0,headerOffset);
+  p.setFont(smallFont());
+  p.setPen(QColor("#d3d9d5"));
+  p.drawText(QRect(10, 9, 100, 20), Qt::AlignVCenter, QStringLiteral("会议"));
+  for (int n = 0; n < days; n += tick) {
+    double px = x(start.addDays(n));
+    p.setPen(QColor(255, 255, 255, 35));
+
+    p.setPen(QColor("#d3d9d5"));
+    p.drawText(QRectF(qBound(double(NameWidth), px - 21, double(width() - 43)),
+                      14, 42, 17),
+               Qt::AlignCenter, start.addDays(n).toString("MM/dd"));
+  }
   bool outside=today<NameWidth||today>width();
   todayOverflow->setVisible(outside);
   if(outside){
     bool left=today<NameWidth;todayOverflow->setText(left?QStringLiteral("← 今天 %1").arg(QDate::currentDate().toString("MM/dd")):QStringLiteral("今天 %1 →").arg(QDate::currentDate().toString("MM/dd")));
     todayOverflow->adjustSize();todayOverflow->resize(todayOverflow->sizeHint().width(),15);
-    todayOverflow->move(left?NameWidth+3:width()-todayOverflow->width()-3,0);todayOverflow->raise();
+    todayOverflow->move(left?NameWidth+3:width()-todayOverflow->width()-3,headerOffset);todayOverflow->raise();
   }
   if (today >= NameWidth && today <= width()) {
     p.setFont(smallFont());
@@ -263,16 +277,8 @@ void Timeline::paintEvent(QPaintEvent *) {
         Qt::AlignVCenter,
         QStringLiteral("今天 ") + QDate::currentDate().toString("MM/dd"));
   }
-  if (insertion >= 0) {
-    p.setPen(QPen(QColor("#eef2ef"), 2));
-    int y = AxisHeight + insertion * RowHeight;
-    p.drawLine(0, y, width(), y);
-  }
-  if (conferences.isEmpty()) {
-    p.setPen(QColor("#d3d9d5"));
-    p.drawText(QRect(0, AxisHeight, width(), RowHeight), Qt::AlignCenter,
-               QStringLiteral("点击「＋ 新建」添加会议"));
-  }
+  p.setPen(QColor(255,255,255,50));p.drawLine(0,AxisHeight-1,width(),AxisHeight-1);p.restore();
+
 }
 int Timeline::nodeAt(QPoint point) const {
  int row=rowAt(point.y());if(row<0||point.x()<NameWidth)return -1;
@@ -332,7 +338,12 @@ void Timeline::wheelEvent(QWheelEvent *e) {
     e->ignore();
     return;
   }
-  if (e->modifiers() & Qt::ShiftModifier)
+#if QT_VERSION >= QT_VERSION_CHECK(6,0,0)
+  double wheelX=e->position().x();
+#else
+  double wheelX=e->posF().x();
+#endif
+  if (wheelX<NameWidth)
     emit scrollRequested(delta);
   else if (e->modifiers() & Qt::ControlModifier) {
     QDate center = start.addDays(days / 2);
@@ -527,6 +538,9 @@ CalendarWindow::CalendarWindow()
   }
 
   auto scroll = new QScrollArea;
+  scroll->setObjectName("conferenceScroll");
+  scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  connect(scroll->verticalScrollBar(),&QScrollBar::valueChanged,timeline,&Timeline::setScrollOffset);
   scroll->setWidgetResizable(true);
   scroll->setWidget(timeline);
   scroll->viewport()->setAutoFillBackground(false);
@@ -543,7 +557,7 @@ CalendarWindow::CalendarWindow()
   status->setStyleSheet("font-size:10px;color:#d3d9d5");
   footer->addWidget(status, 1);
   footer->addLayout(legend);
-  timeline->setToolTip(QStringLiteral("滚轮平移 · Ctrl + 滚轮缩放 · Shift + 滚轮上下滚动"));
+  timeline->setToolTip(QStringLiteral("左侧滚轮上下滚动 · 时间轴滚轮平移 · Ctrl + 滚轮缩放"));
   root->addLayout(footer);
   dataPath = storageDirectory() + "/conferences.json";
   load();

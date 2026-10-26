@@ -29,6 +29,8 @@ public:
   static QColor tint(QColor color);
   static QColor ink(QColor color);
   void refresh();
+  void setScrollOffset(int value);
+  int scrollOffset() const {return headerOffset;}
 signals:
   void rangeChanged();
   void scrollRequested(int delta);
@@ -50,6 +52,7 @@ protected:
   bool event(QEvent *) override;
 
 private:
+  int headerOffset=0;
   QPushButton *todayOverflow;
   QPoint press;
   int pressedRow = -1, insertion = -1;

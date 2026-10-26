@@ -295,6 +295,20 @@ private slots:
     QTest::qWait(100);
     QVERIFY(window.grab().save(QDir::currentPath() + "/qt-preview.png"));
   }
+  void stickyHeaderAndWheelRegions(){
+    CalendarWindow window;auto t=window.findChild<Timeline*>();auto scroll=window.findChild<QScrollArea*>("conferenceScroll");
+    for(int i=0;i<20;i++){Conference c;c.id=QString::number(i);c.name="Conference";c.dates[0]=QDate::currentDate().addDays(5);t->conferences.append(c);}t->refresh();window.resize(580,250);window.show();QTest::qWait(30);
+    auto wheel=[&](int x,Qt::KeyboardModifiers modifiers=Qt::NoModifier){QPointF point(x,t->scrollOffset()+60);QWheelEvent e(point,t->mapToGlobal(point.toPoint()),QPoint(),QPoint(0,-120),Qt::NoButton,modifiers,Qt::NoScrollPhase,false);QApplication::sendEvent(t,&e);QCoreApplication::processEvents();QVERIFY(e.isAccepted());};
+    QDate start=t->start;int span=t->days;wheel(60);QCOMPARE(t->start,start);QCOMPARE(t->days,span);int offset=scroll->verticalScrollBar()->value();QVERIFY(offset>0);QCOMPARE(t->scrollOffset(),offset);
+    wheel(400);QVERIFY(t->start>start);QCOMPARE(scroll->verticalScrollBar()->value(),offset);
+    wheel(400,Qt::ShiftModifier);QCOMPARE(scroll->verticalScrollBar()->value(),offset);
+    wheel(400,Qt::ControlModifier);QVERIFY(t->days>span);QCOMPARE(scroll->verticalScrollBar()->value(),offset);
+    span=t->days;start=t->start;wheel(60,Qt::ControlModifier);QCOMPARE(t->start,start);QCOMPARE(t->days,span);
+    t->start=QDate::currentDate().addDays(7);t->update();t->grab();auto today=t->findChild<QPushButton*>("todayOverflow");QVERIFY(today->isVisible());QCOMPARE(today->y(),t->scrollOffset());today->click();QCOMPARE(t->start,QDate::currentDate().addDays(-t->days/4));
+    QSignalSpy edit(t,&Timeline::editRequested);QTest::mouseClick(t,Qt::LeftButton,Qt::NoModifier,QPoint(60,t->scrollOffset()+20));QCOMPARE(edit.count(),0);
+    QVERIFY(window.grab().save(QDir::currentPath()+"/sticky-header-preview.png"));
+  }
+
 };
 int main(int argc, char **argv) {
   QTemporaryDir directory(QDir::currentPath() + "/calendar-tests-XXXXXX");
