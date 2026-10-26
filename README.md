@@ -1,48 +1,66 @@
-# Paper Calendar
+# PaperCalendar
 
-基于原桌面便签框架的 Qt 会议时间轴，布局与 `docs/ui-prototype.html` 保持一致。详细设计见 `docs/design.zh-CN.md`。
+一个轻量的 Windows Qt 桌面会议时间轴，把多场会议的投稿与审稿日期并排展示。
 
-## 使用
+![PaperCalendar 会议时间轴](docs/screenshots/timeline.png)
 
-- 左侧会议名称区滚轮上下滚动列表；右侧时间轴滚轮平移时间，Ctrl + 滚轮缩放。日期表头、今天标注及越界按钮固定在顶部。
-- 单击会议名称编辑，编辑框内可删除。
-- 拖动左侧六点拖柄排序；选中行后 Alt + ↑ / ↓ 也可排序，顺序自动保存。
-- 点击图例换色，节点、浅色标签与区间同步更新，重启保留。
-- Unlock 时可拖动标题区域、拖动边缘缩放；Lock 锁定窗口位置和大小。
-- 越界时点击“箭头＋今天日期”归位，× 退出。固定使用桌面伴随，不再提供模式选择。窗口背景为半透明灰色。
+*实际 Qt 界面；会议名称和日期均为虚构演示数据。*
 
-图例与会议数量合并在底栏。五项日期可直接输入、粘贴或用日历选择，留空表示尚未公布；不再提供“日期已确定”勾选。新增第五个“最终结果”日期；旧记录兼容保留，补填后显示节点。AoE 和时区转换不做改动。
+## 功能
 
-摘要前不绘制人为准备区间。日期标签自动错层并用引线对应节点；悬停查看完整事件、日期及剩余天数；点击节点或日期标签展开详情卡片，点击外部或按 Esc 关闭。首次运行没有演示记录。
+- 每场会议包含摘要截止、正文截止、审稿发布、回复截止、最终结果五个日期，支持留空。
+- 浅色区间表示相邻阶段，节点对应具体日期；摘要截止前不绘制人为区间。
+- 点击底部图例更换阶段颜色，节点、标签和区间同步更新。
+- 日期标签自动错开，悬停查看日期和剩余天数，点击展开详情。
+- 半透明灰色背景，默认桌面伴随与锁定功能，顺序、颜色和窗口设置自动保存。
 
-数据存于 Qt AppDataLocation 下的 conferences.json 和 settings.ini，Windows 通常为 `%APPDATA%/PaperCalendar/PaperCalendar/`。也可以指定便携目录：
+## 下载与运行
+
+从 [最新 Release](https://github.com/Sur-Ring/PaperCalendar/releases/latest) 下载 `PaperCalendar-v1.0.0-windows-x64.zip`，**解压整个文件夹**，双击 `PaperCalendar.exe`。包内附带 Qt 和 MinGW 运行依赖，无需安装 Qt；请保留 DLL 和插件目录。
+
+发布环境为 Windows 11 x64、Qt 6.8.3。其他 Windows 版本尚未验证。首次启动为空列表，截图仅为演示数据。
+
+## 操作
+
+| 操作 | 效果 |
+| --- | --- |
+| 左侧名称区滚轮 | 上下滚动列表 |
+| 右侧时间轴滚轮 | 平移时间范围 |
+| 时间轴 Ctrl＋滚轮 | 缩放时间范围 |
+| 单击名称 | 编辑或删除记录 |
+| 拖动左侧六点柄 | 调整行顺序 |
+| 选中行后 Alt＋↑ / ↓ | 调整行顺序 |
+| 点击越界的“← 今天”或“今天 →” | 回到今天附近 |
+| 点击锁图标 | 锁定／解锁窗口位置及大小 |
+
+日期表头和今天标注固定在顶部；每次启动默认显示今天。解锁后可拖动标题区域移动窗口、拖动边缘调整大小，× 退出应用。
+
+## 数据与自启动
+
+默认数据目录为 `%APPDATA%/PaperCalendar/PaperCalendar/`，保存 `conferences.json` 和 `settings.ini`。更新程序前备份该目录；替换程序文件不会清空这里的数据。也可指定便携数据目录：
 
 ```powershell
-.\build-calendar\PaperCalendar.exe --data-dir .\my-data
+.\PaperCalendar.exe --data-dir .\my-data
 ```
 
-## 构建与验证
+登录 Windows 时自动启动：按 Win＋R，输入 `shell:startup`，将 `PaperCalendar.exe` 的**快捷方式**放入打开的文件夹。快捷方式应指向固定存放的完整程序目录；移除该快捷方式即可取消自启动。
 
-需要 CMake 3.16+、C++17、Qt 5.15+ 或 Qt 6 Widgets。编译器须与 Qt ABI 匹配，Qt 与编译器的 bin 应加入 PATH。默认构建测试需要 Qt Test，可用 `-DBUILD_TESTING=OFF` 关闭。
+## 从源码构建
+
+需要 CMake 3.16+、C++17、Ninja 和 Qt Widgets。编译器必须与 Qt ABI 匹配，并将 Qt 与编译器的 bin 加入 PATH。测试还需要 Qt Test。
 
 ```powershell
 cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH="你的 Qt 安装目录"
-cmake --build build
+cmake --build build --target PaperCalendar CalendarTests
 ctest --test-dir build --output-on-failure
 ```
 
-本机当前新版位于 build-calendar/desktop-fix（旧版运行中，避免覆盖），已附 Qt 和编译器运行库。测试使用构建目录下的临时数据目录，不访问真实会议数据；Qt 快照中的会议为演示记录。Windows 原生平台测试需以 `QT_QPA_PLATFORM=windows` 运行 CalendarTests；CTest 默认使用 offscreen。
+本版本已通过 Windows 原生平台及 offscreen 自动测试。测试使用临时数据，不访问真实记录。可通过 `-DBUILD_TESTING=OFF` 关闭测试目标。
 
-桌面伴随使用前台事件、去抖、复核和不抢焦点的临时置顶。Win+D、多显示器、全屏应用、Explorer 重启尚待人工验收。原生边缘锁定逻辑面向 Windows。
+## 许可
 
-旧 StickyNote、ToolBar 文件保留但退出构建。当前数据为日期精度、单实例编辑设计，不支持云同步或并发编辑。
+项目沿用仓库中的 [GNU AGPL v3](LICENSE)。发行包使用动态链接的 Qt，第三方许可与来源见 `THIRD_PARTY_NOTICES.md` 和包内 `licenses/`。源码可从本仓库对应 Release 标签获取。
 
-## 本地恢复点与桌面后端研究
+## 设计与实验
 
-当前实现恢复标签：`paper-calendar-baseline-20261026`。已清理历史发布构建，保留 `build-calendar/desktop-fix`。
-
-WorkerW 的本机只读检查、实际问题与实验建议见 `docs/workerw-research.zh-CN.md`。诊断源码为 `tools/desktop_probe.cpp`，本轮没有切换应用后端。
-
-## 可选桌面挂载实验
-
-桌面挂载实验在本机实际显示验证失败，已取消自动启用。两个 exe 普通双击均使用原来的后端；仅显式 `--desktop-host` 启用隔离数据的实验。当前挂载关系检查通过但真实显示失败，原有桌面伴随后端仍为默认。具体运行和已知验证范围见 `docs/workerw-experiment.zh-CN.md`。
+[设计文档](docs/design.zh-CN.md)与 [HTML 原型](docs/ui-prototype.html)用于设计参考，实际界面以本 README 截图为准。源码保留桌面挂载实验，但默认使用桌面伴随后端；WorkerW 在本机显示验证失败，不建议启用。多显示器、Explorer 重启、全屏与 Win＋D 的全部组合仍需人工验证。日期按本地日历日处理，不执行 AoE 时区转换。
